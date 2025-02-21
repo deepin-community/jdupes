@@ -9,7 +9,7 @@ extern "C" {
 #endif
 
 /* Detect Windows and modify as needed */
-#if defined _WIN32 || defined __CYGWIN__
+#if defined _WIN32 || defined __MINGW32__
  #ifndef ON_WINDOWS
   #define ON_WINDOWS 1
  #endif
@@ -21,27 +21,16 @@ extern "C" {
  #endif
  #include <windows.h>
  #include <io.h>
- #include "win_stat.h"
 #endif /* Win32 */
 
 #include <limits.h>
 #include <stdint.h>
 #include <sys/types.h>
-#include <unistd.h>
-#include "string_malloc.h"
-#include "jody_sort.h"
-#include "version.h"
-
-#include "xxhash.h"
-
-/* Set hash type (change this if swapping in a different hash function) */
- typedef XXH64_hash_t jdupes_hash_t;
 
 /* Some types are different on Windows */
-#ifdef ON_WINDOWS
+#if defined _WIN32 || defined __MINGW32__
  typedef uint64_t jdupes_ino_t;
  typedef uint32_t jdupes_mode_t;
- extern const char dir_sep;
  #ifdef UNICODE
   extern const wchar_t *FILE_MODE_RO;
  #else
@@ -53,31 +42,76 @@ extern "C" {
  typedef ino_t jdupes_ino_t;
  typedef mode_t jdupes_mode_t;
  extern const char *FILE_MODE_RO;
- extern const char dir_sep;
  #ifdef UNICODE
   #error Do not define UNICODE on non-Windows platforms.
   #undef UNICODE
  #endif
-#endif /* _WIN32 || __CYGWIN__ */
+#endif /* _WIN32 || __MINGW32__ */
 
 /* Windows + Unicode compilation */
 #ifdef UNICODE
- #define WPATH_MAX 8192
- #define PATHBUF_SIZE WPATH_MAX
-  typedef wchar_t wpath_t[WPATH_MAX];
-  extern int out_mode;
-  extern int err_mode;
+ #ifndef PATHBUF_SIZE
+  #ifndef WPATH_MAX
+   #define WPATH_MAX 8192
+  #endif
+  #define PATHBUF_SIZE WPATH_MAX
+ #else
+  #ifndef WPATH_MAX
+   #define WPATH_MAX PATHBUF_SIZE
+  #endif
+ #endif /* PATHBUF_SIZE */
+ typedef wchar_t wpath_t[WPATH_MAX];
  #define M2W(a,b) MultiByteToWideChar(CP_UTF8, 0, a, -1, (LPWSTR)b, WPATH_MAX)
  #define W2M(a,b) WideCharToMultiByte(CP_UTF8, 0, a, -1, (LPSTR)b, WPATH_MAX, NULL, NULL)
+ extern wpath_t wstr;
 #endif /* UNICODE */
 
-#ifndef NO_SYMLINKS
-#include "jody_paths.h"
+/* Maximum path buffer size to use; must be large enough for a path plus
+ * any work that might be done to the array it's stored in. PATH_MAX is
+ * not always true. Read this article on the false promises of PATH_MAX:
+ * http://insanecoding.blogspot.com/2007/11/pathmax-simply-isnt.html
+ * Windows + Unicode needs a lot more space than UTF-8 in Linux/Mac OS X
+ */
+#ifndef PATHBUF_SIZE
+ #define PATHBUF_SIZE 4096
 #endif
+/* Complain if PATHBUF_SIZE is too small */
+#if PATHBUF_SIZE < PATH_MAX
+ #if !defined LOW_MEMORY && !defined BARE_BONES
+  #warning "PATHBUF_SIZE is less than PATH_MAX"
+ #endif
+#endif
+
+/* Debugging stats */
+#ifdef DEBUG
+extern unsigned int small_file, partial_hash, partial_elim;
+extern unsigned int full_hash, partial_to_full, hash_fail;
+extern uintmax_t comparisons;
+ #ifdef ON_WINDOWS
+  #ifndef NO_HARDLINKS
+  extern unsigned int hll_exclude;
+  #endif
+ #endif
+#endif /* DEBUG */
+
 
 #define ISFLAG(a,b) ((a & b) == b)
 #define SETFLAG(a,b) (a |= b)
 #define CLEARFLAG(a,b) (a &= (~b))
+
+/* Chunk sizing */
+#ifndef CHUNK_SIZE
+ #define CHUNK_SIZE 65536
+#endif
+#ifndef NO_CHUNKSIZE
+ extern size_t auto_chunk_size;
+ /* Larger chunk size makes large files process faster but uses more RAM */
+ #define MIN_CHUNK_SIZE 4096
+ #define MAX_CHUNK_SIZE 1048576 * 256
+#else
+ /* If automatic chunk sizing is disabled, just use a fixed value */
+ #define auto_chunk_size CHUNK_SIZE
+#endif /* NO_CHUNKSIZE */
 
 /* Low memory option overrides */
 #ifdef LOW_MEMORY
@@ -99,38 +133,44 @@ extern "C" {
 /* Compile out debugging stat counters unless requested */
 #ifdef DEBUG
  #define DBG(a) a
- #ifndef TREE_DEPTH_STATS
-  #define TREE_DEPTH_STATS
- #endif
 #else
  #define DBG(a)
 #endif
 
 
+/* Compare two hashes like memcmp() */
+#define HASH_COMPARE(a,b) ((a > b) ? 1:((a == b) ? 0:-1))
+
+/* Extend an allocation length to the next 64-bit (8-byte) boundary */
+#define EXTEND64(a) (((a) & 0x7) > 0 ? (((a) & (~0x7)) + 8) : (a))
+
 /* Behavior modification flags */
-extern uint_fast32_t flags, a_flags;
-#define F_RECURSE		(1U << 0)
-#define F_HIDEPROGRESS		(1U << 1)
-#define F_SOFTABORT		(1U << 2)
-#define F_FOLLOWLINKS		(1U << 3)
-#define F_INCLUDEEMPTY		(1U << 4)
-#define F_CONSIDERHARDLINKS	(1U << 5)
-#define F_RECURSEAFTER		(1U << 6)
-#define F_NOPROMPT		(1U << 7)
-#define F_EXCLUDEHIDDEN		(1U << 8)
-#define F_PERMISSIONS		(1U << 9)
-#define F_EXCLUDESIZE		(1U << 10)
-#define F_QUICKCOMPARE		(1U << 11)
-#define F_USEPARAMORDER		(1U << 12)
-#define F_REVERSESORT		(1U << 13)
-#define F_ISOLATE		(1U << 14)
-#define F_ONEFS			(1U << 15)
-#define F_PARTIALONLY		(1U << 16)
-#define F_NOCHANGECHECK		(1U << 17)
-#define F_NOTRAVCHECK		(1U << 18)
-#define F_SKIPHASH		(1U << 19)
-#define F_LOUD			(1U << 30)
-#define F_DEBUG			(1U << 31)
+extern uint64_t flags, a_flags, p_flags;
+#define F_RECURSE		(1ULL << 0)
+#define F_HIDEPROGRESS		(1ULL << 1)
+#define F_SOFTABORT		(1ULL << 2)
+#define F_FOLLOWLINKS		(1ULL << 3)
+#define F_INCLUDEEMPTY		(1ULL << 4)
+#define F_CONSIDERHARDLINKS	(1ULL << 5)
+#define F_RECURSEAFTER		(1ULL << 6)
+#define F_NOPROMPT		(1ULL << 7)
+#define F_EXCLUDEHIDDEN		(1ULL << 8)
+#define F_PERMISSIONS		(1ULL << 9)
+#define F_EXCLUDESIZE		(1ULL << 10)
+#define F_QUICKCOMPARE		(1ULL << 11)
+#define F_USEPARAMORDER		(1ULL << 12)
+#define F_REVERSESORT		(1ULL << 13)
+#define F_ISOLATE		(1ULL << 14)
+#define F_ONEFS			(1ULL << 15)
+#define F_PARTIALONLY		(1ULL << 16)
+#define F_NOCHANGECHECK		(1ULL << 17)
+#define F_NOTRAVCHECK		(1ULL << 18)
+#define F_SKIPHASH		(1ULL << 19)
+#define F_BENCHMARKSTOP		(1ULL << 29)
+#define F_HASHDB		(1ULL << 30)
+
+#define F_LOUD			(1ULL << 62)
+#define F_DEBUG			(1ULL << 63)
 
 /* Action-related flags */
 #define FA_PRINTMATCHES		(1U << 0)
@@ -144,6 +184,7 @@ extern uint_fast32_t flags, a_flags;
 #define FA_MAKESYMLINKS		(1U << 8)
 #define FA_PRINTNULL		(1U << 9)
 #define FA_PRINTJSON		(1U << 10)
+#define FA_ERRORONDUPE		(1U << 11)
 
 /* Per-file true/false flags */
 #define FF_VALID_STAT		(1U << 0)
@@ -152,6 +193,7 @@ extern uint_fast32_t flags, a_flags;
 #define FF_HAS_DUPES		(1U << 3)
 #define FF_IS_SYMLINK		(1U << 4)
 #define FF_NOT_UNIQUE		(1U << 5)
+#define FF_HASHDB_DIRTY		(1U << 5)
 
 /* Extra print flags */
 #define PF_PARTIAL		(1U << 0)
@@ -167,38 +209,34 @@ typedef enum {
  #define PARTIAL_HASH_SIZE 4096
 #endif
 
-/* Maximum path buffer size to use; must be large enough for a path plus
- * any work that might be done to the array it's stored in. PATH_MAX is
- * not always true. Read this article on the false promises of PATH_MAX:
- * http://insanecoding.blogspot.com/2007/11/pathmax-simply-isnt.html
- * Windows + Unicode needs a lot more space than UTF-8 in Linux/Mac OS X
- */
-#ifndef PATHBUF_SIZE
-#define PATHBUF_SIZE 4096
-#endif
-
 /* Per-file information */
 typedef struct _file {
   struct _file *duplicates;
   struct _file *next;
   char *d_name;
-  dev_t device;
-  jdupes_mode_t mode;
-  off_t size;
+  int d_name_len;
+  uint64_t filehash_partial;
+  uint64_t filehash;
   jdupes_ino_t inode;
-  jdupes_hash_t filehash_partial;
-  jdupes_hash_t filehash;
+  off_t size;
+#ifndef NO_MTIME
   time_t mtime;
+#endif
+  dev_t device;
   uint32_t flags;  /* Status flags */
+  jdupes_mode_t mode;
+#ifndef NO_ATIME
+  time_t atime;
+#endif
 #ifndef NO_USER_ORDER
   unsigned int user_order; /* Order of the originating command-line parameter */
 #endif
 #ifndef NO_HARDLINKS
- #ifndef ON_WINDOWS
-  nlink_t nlink;
- #else
+ #ifdef ON_WINDOWS
   uint32_t nlink;  /* link count on Windows is always a DWORD */
- #endif
+ #else
+  nlink_t nlink;
+ #endif /* ON_WINDOWS */
 #endif
 #ifndef NO_PERMS
   uid_t uid;
@@ -214,73 +252,25 @@ typedef struct _filetree {
 
 /* This gets used in many functions */
 #ifdef ON_WINDOWS
- extern struct winstat s;
- #define STAT win_stat
+ extern struct jc_winstat s;
+ #define STAT jc_win_stat
 #else
  extern struct stat s;
  #define STAT stat
 #endif
 
+/* Progress indicator variables */
+extern uintmax_t filecount, progress, item_progress, dupecount;
 
-/* -X extended filter parameter stack */
-struct extfilter {
-  struct extfilter *next;
-  unsigned int flags;
-  int64_t size;  /* also used for other large integers */
-  char param[];
-};
+extern int hash_algo;
+extern unsigned int user_item_count;
+extern int sort_direction;
+extern char tempname[];
+extern const char *feature_flags[];
+extern const char *s_no_dupes;
+extern int exit_status;
 
-/* Extended filter parameter flags */
-#define XF_EXCL_EXT		0x00000001U
-#define XF_SIZE_EQ		0x00000002U
-#define XF_SIZE_GT		0x00000004U
-#define XF_SIZE_LT		0x00000008U
-#define XF_ONLY_EXT		0x00000010U
-#define XF_EXCL_STR		0x00000020U
-#define XF_ONLY_STR		0x00000040U
-#define XF_DATE_NEWER		0x00000080U
-#define XF_DATE_OLDER		0x00000100U
-/* The X-than-or-equal are combination flags */
-#define XF_SIZE_GTEQ		0x00000006U
-#define XF_SIZE_LTEQ		0x0000000aU
-
-/* Flags that use a numeric size with optional suffix */
-#define XF_REQ_NUMBER		0x0000000eU
-/* Flags that require a data parameter (after a colon) */
-#define XF_REQ_VALUE		0x0000001fU
-/* Flags that take a date that needs to be converted to time_t seconds */
-#define XF_REQ_DATE		0x00000180U
-
-/* Exclude definition array */
-struct extfilter_tags {
-  const char * const tag;
-  const uint32_t flags;
-};
-
-extern const struct extfilter_tags extfilter_tags[];
-extern struct extfilter *extfilter_head;
-
-
-/* Suffix definitions (treat as case-insensitive) */
-struct size_suffix {
-  const char * const suffix;
-  const int64_t multiplier;
-};
-
-extern const struct size_suffix size_suffix[];
-extern char tempname[PATHBUF_SIZE * 2];
-
-extern const char *extensions[];
-
-extern void nullptr(const char * restrict func);
-extern int file_has_changed(file_t * const restrict file);
-extern int getfilestats(file_t * const restrict file);
-extern int getdirstats(const char * const restrict name,
-        jdupes_ino_t * const restrict inode, dev_t * const restrict dev,
-	jdupes_mode_t * const restrict mode);
-extern int check_conditions(const file_t * const restrict file1, const file_t * const restrict file2);
-extern unsigned int get_max_dupes(const file_t *files, unsigned int * const restrict max,
-		                unsigned int * const restrict n_files);
+int file_has_changed(file_t * const restrict file);
 
 #ifdef __cplusplus
 }

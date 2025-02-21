@@ -1,4 +1,6 @@
-Bug-Database: https://github.com/jbruchon/jdupes/issues
-Bug-Submit: https://github.com/jbruchon/jdupes/issues/new
-Repository: https://github.com/jbruchon/jdupes.git
-Repository-Browse: https://github.com/jbruchon/jdupes
+Bug-Database: https://codeberg.org/jbruchon/jdupes/issues
+Bug-Submit: https://codeberg.org/jbruchon/jdupes/issues/new
+Documentation: https://codeberg.org/jbruchon/jdupes/src/branch/master/README.md
+Donation: https://www.jodybruchon.com
+Repository: https://codeberg.org/jbruchon/jdupes.git
+Repository-Browse: https://codeberg.org/jbruchon/jdupes

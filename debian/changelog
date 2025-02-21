@@ -1,3 +1,186 @@
+jdupes (1.28.0-1) unstable; urgency=medium
+
+  * New upstream version 1.28.0.
+  * debian/control:
+      - Added a relationship to libjodycode-dev.
+      - Bumped Standards-Version to 4.7.0.
+  * debian/copyright: updated upstream and packaging copyright years.
+  * debian/docs: added ISSUES.txt.
+  * debian/patches/: removed patches 020_fix-data-loss.patch and
+    030_fix-crash-database.patch, already present in new upstream version.
+
+ -- Joao Eriberto Mota Filho <eriberto@debian.org>  Mon, 05 Aug 2024 19:05:55 -0300
+
+jdupes (1.27.3-5) unstable; urgency=medium
+
+  * jdupes has a homepage and a new repository (Codeberg). Consequently:
+      - debian/control: updated the Homepage field.
+      - debian/copyright: updated Upstream-Contact and Source fields.
+      - debian/upstream/metadata: updated all data.
+  * debian/patches/030_fix-crash-database.patch: created to fix a possible
+    crash of the database. Thanks to Jody Bruchon (the upstream).
+
+ -- Joao Eriberto Mota Filho <eriberto@debian.org>  Mon, 13 Nov 2023 22:46:45 -0300
+
+jdupes (1.27.3-4) unstable; urgency=medium
+
+  * debian/patches/020_fix-data-loss.patch: created to avoid a potential data
+    loss caused by a wrong message that induces the users to use a range of
+    values with -d option. Currently, the -d option doesn't understand ranges.
+    (Closes: #1054237)
+
+ -- Joao Eriberto Mota Filho <eriberto@debian.org>  Thu, 19 Oct 2023 13:40:10 -0300
+
+jdupes (1.27.3-3) unstable; urgency=medium
+
+  * debian/watch: updated because the upstream moved the project from GitHub
+    to Codeberg.
+
+ -- Joao Eriberto Mota Filho <eriberto@debian.org>  Tue, 10 Oct 2023 13:53:09 -0300
+
+jdupes (1.27.3-2) unstable; urgency=medium
+
+  * debian/patches/010_fix-FTBFS-Hurd.patch: created to fix the build on Hurd,
+    declaring the PATH_MAX variable.
+
+ -- Joao Eriberto Mota Filho <eriberto@debian.org>  Tue, 29 Aug 2023 17:30:27 -0300
+
+jdupes (1.27.3-1) unstable; urgency=medium
+
+  * New upstream version 1.27.3.
+
+ -- Joao Eriberto Mota Filho <eriberto@debian.org>  Tue, 29 Aug 2023 15:01:06 -0300
+
+jdupes (1.26.1-1) unstable; urgency=medium
+
+  * New upstream version 1.26.1.
+
+ -- Joao Eriberto Mota Filho <eriberto@debian.org>  Tue, 04 Jul 2023 19:20:02 -0300
+
+jdupes (1.26-2) unstable; urgency=medium
+
+  * Upload to unstable.
+
+ -- Joao Eriberto Mota Filho <eriberto@debian.org>  Tue, 04 Jul 2023 08:54:08 -0300
+
+jdupes (1.26-1) experimental; urgency=medium
+
+  * New upstream version 1.26.
+  * debian/tests/control: fixed the first test.
+
+ -- Joao Eriberto Mota Filho <eriberto@debian.org>  Mon, 03 Jul 2023 23:55:49 -0300
+
+jdupes (1.25.2-1) unstable; urgency=medium
+
+  * New upstream version 1.25.2.
+  * Upload to unstable.
+  * debian/rules: removed no longer needed override_dh_auto_test.
+  * debian/tests/control: added a new CI test to check the -q option.
+
+ -- Joao Eriberto Mota Filho <eriberto@debian.org>  Sat, 24 Jun 2023 08:38:17 -0300
+
+jdupes (1.25.0-2) experimental; urgency=medium
+
+  * debian/control: changed from libjodycode3-dev to libjodycode-dev in
+    Build-Depends field. (see #1038752)
+
+ -- Joao Eriberto Mota Filho <eriberto@debian.org>  Wed, 21 Jun 2023 23:55:52 -0300
+
+jdupes (1.25.0-1) unstable; urgency=medium
+
+  * New upstream version 1.25.0.
+  * debian/control: changed from libjodycode2-dev to libjodycode3-dev in
+    Build-Depends field.
+  * debian/patches/010_fix-hardlinks.patch: removed. This patch was taken from
+    the current (new and fixed) upstream source code.
+
+ -- Joao Eriberto Mota Filho <eriberto@debian.org>  Sun, 18 Jun 2023 13:58:48 -0300
+
+jdupes (1.24.0-2) unstable; urgency=medium
+
+  * debian/patches/010_fix-hardlinks.patch: created to fix an issue
+    with hardlinks. Thanks to Jody Bruchon <jody@jodybruchon.com>.
+    (Closes: #1038417)
+
+ -- Joao Eriberto Mota Filho <eriberto@debian.org>  Sat, 17 Jun 2023 21:14:37 -0300
+
+jdupes (1.24.0-1) unstable; urgency=medium
+
+  * New upstream version 1.24.0.
+  * debian/control: added libjodycode2-dev to Build-Depends field.
+  * debian/copyright:
+      - Removed block about oom.c and oom.h because these files no longer
+        exist in source code. Consequently:
+      - Removed the text of the CC0-1.0 license.
+      - Updated upstream copyright data to reflect new statements from the
+        source code.
+  * debian/tests/control: removed option -D from command9 to avoid an error.
+  * debian/upstream/metadata: added Documentation field.
+
+ -- Joao Eriberto Mota Filho <eriberto@debian.org>  Fri, 16 Jun 2023 16:23:08 -0300
+
+jdupes (1.21.3-1) unstable; urgency=medium
+
+  * New upstream version 1.21.3.
+  * debian/patches/010_fix-no-file-travdone.patch: removed because the upstream
+    fixed the source code. Thanks!
+
+ -- Joao Eriberto Mota Filho <eriberto@debian.org>  Mon, 20 Feb 2023 06:51:57 -0300
+
+jdupes (1.21.2-2) unstable; urgency=medium
+
+  * debian/patches/010_fix-no-file-travdone.patch: created to fix an internal
+    error when jdupes runs over a non-existent directory. Thanks to Alberto
+    Garcia <berto@igalia.com> and Jody Bruchon <jody@jodybruchon.com>.
+    (Closes: #1030933)
+  * debian/tests/control: added a new test, specific for #1030933.
+
+ -- Joao Eriberto Mota Filho <eriberto@debian.org>  Fri, 10 Feb 2023 17:17:56 -0300
+
+jdupes (1.21.2-1) unstable; urgency=medium
+
+  * New upstream version 1.21.2.
+  * debian/control: bumped Standards-Version to 4.6.2.
+  * debian/copyright: updated upstream and packaging copyright years.
+
+ -- Joao Eriberto Mota Filho <eriberto@debian.org>  Tue, 07 Feb 2023 23:15:20 -0300
+
+jdupes (1.21.1-1) unstable; urgency=medium
+
+  * New upstream version 1.21.1.
+  * debian/patches/010_fix-dedup-btrfs.patch: removed because the upstream
+    released a fixed the source code. Thanks.
+
+ -- Joao Eriberto Mota Filho <eriberto@debian.org>  Fri, 02 Dec 2022 14:41:09 -0300
+
+jdupes (1.21.0-3) unstable; urgency=medium
+
+  * debian/watch: updated the search rule to make it compliant with new
+    standards of the GitHub.
+
+ -- Joao Eriberto Mota Filho <eriberto@debian.org>  Mon, 03 Oct 2022 00:11:08 -0300
+
+jdupes (1.21.0-2) unstable; urgency=medium
+
+  * debian/patches/010_fix-dedup-btrfs.patch: created to fix BTRFS
+    deduplication broken since upstream/1.21.0. Thanks to Calum
+    McConnell <calumlikesapplepie@gmail.com>. (Closes: #1019588)
+  * debian/tests/control: improved all tests making checks over the results.
+
+ -- Joao Eriberto Mota Filho <eriberto@debian.org>  Sat, 17 Sep 2022 12:53:25 -0300
+
+jdupes (1.21.0-1) unstable; urgency=medium
+
+  * New upstream version 1.21.0.
+  * debian/control: bumped Standards-Version to 4.6.1.
+  * debian/copyright:
+      - Changed the licensing for linux-dedupe-static.h, updated by the
+        upstream.
+      - Updated upstream and packaging copyright years.
+  * debian/upstream/metadata: added field Donation.
+
+ -- Joao Eriberto Mota Filho <eriberto@debian.org>  Tue, 06 Sep 2022 01:26:40 -0300
+
 jdupes (1.20.2-1) unstable; urgency=medium
 
   * New upstream version 1.20.2.
