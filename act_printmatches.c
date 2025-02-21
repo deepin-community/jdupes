@@ -5,10 +5,10 @@
 #include <stdint.h>
 #include <inttypes.h>
 #include "jdupes.h"
-#include "jody_win_unicode.h"
+#include <libjodycode.h>
 #include "act_printmatches.h"
 
-extern void printmatches(file_t * restrict files)
+void printmatches(file_t * restrict files)
 {
   file_t * restrict tmpfile;
   int printed = 0;
@@ -24,28 +24,28 @@ extern void printmatches(file_t * restrict files)
       if (!ISFLAG(a_flags, FA_OMITFIRST)) {
         if (ISFLAG(a_flags, FA_SHOWSIZE)) printf("%" PRIdMAX " byte%c each:\n", (intmax_t)files->size,
             (files->size != 1) ? 's' : ' ');
-        fwprint(stdout, files->d_name, cr);
+        jc_fwprint(stdout, files->d_name, cr);
       }
       tmpfile = files->duplicates;
       while (tmpfile != NULL) {
-        fwprint(stdout, tmpfile->d_name, cr);
+        jc_fwprint(stdout, tmpfile->d_name, cr);
         tmpfile = tmpfile->duplicates;
       }
-      if (files->next != NULL) fwprint(stdout, "", cr);
+      if (files->next != NULL) jc_fwprint(stdout, "", cr);
 
     }
 
     files = files->next;
   }
 
-  if (printed == 0) fwprint(stderr, "No duplicates found.", 1);
+  if (printed == 0) printf("%s", s_no_dupes);
 
   return;
 }
 
 
 /* Print files that have no duplicates (unique files) */
-extern void printunique(file_t *files)
+void printunique(file_t *files)
 {
   file_t *chain, *scan;
   int printed = 0;
@@ -72,12 +72,12 @@ extern void printunique(file_t *files)
       printed = 1;
       if (ISFLAG(a_flags, FA_SHOWSIZE)) printf("%" PRIdMAX " byte%c each:\n", (intmax_t)files->size,
           (files->size != 1) ? 's' : ' ');
-      fwprint(stdout, files->d_name, cr);
+      jc_fwprint(stdout, files->d_name, cr);
     }
     files = files->next;
   }
 
-  if (printed == 0) fwprint(stderr, "No unique files found.", 1);
+  if (printed == 0) jc_fwprint(stderr, "No unique files found.", 1);
 
   return;
 }

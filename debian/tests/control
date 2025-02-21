@@ -1,33 +1,42 @@
-Test-Command: jdupes -v
+Test-Command: jdupes -v | egrep 'jdupes [0-9]+\.[0-9]+'
 Restrictions: superficial
 
-Test-Command: jdupes debian/tests/files/
+Test-Command: jdupes debian/tests/files/ | grep list -C2 | grep -C2 list3
 
-Test-Command: jdupes -m debian/tests/files/
+Test-Command: jdupes -m debian/tests/files/ | egrep 'duplicate.+occupying'
 
-Test-Command: jdupes -M debian/tests/files/
+Test-Command: jdupes -M debian/tests/files/ | grep -C20 list |
+              grep -C20 list3 | egrep 'duplicate.+occupying'
 
-Test-Command: jdupes -r0 debian/tests/files/
+Test-Command: jdupes -r0 debian/tests/files/ | grep -a openlogo-100.png
 
-Test-Command: jdupes -mr debian/tests/files/
+Test-Command: jdupes -mr debian/tests/files/ | egrep 'duplicate.+occupying'
 
-Test-Command: jdupes -ru debian/tests/files/
+Test-Command: jdupes -ru debian/tests/files/ | grep -C10 list2 | grep -C10 list8
 
 # testdir is a test directory provided by the upstream
-Test-Command: jdupes -r testdir
+Test-Command: jdupes -r testdir | grep -C200 tinydupe2 | grep -C200 file100
 
 Test-Command: cp -a debian/tests/files/ $AUTOPKGTEST_TMP;
-              jdupes -@1ADHiprls $AUTOPKGTEST_TMP/files;
-              tree -C $AUTOPKGTEST_TMP/
+              jdupes -@1AHiprls $AUTOPKGTEST_TMP/files;
+              tree -C $AUTOPKGTEST_TMP/ | grep -C50 list1| grep -C50 list7
+Depends: @, tree:native
+
+Test-Command: cp -a debian/tests/files/ $AUTOPKGTEST_TMP;
+              jdupes -@1AHiprlsq $AUTOPKGTEST_TMP/files;
+              tree -C $AUTOPKGTEST_TMP/ | grep -C50 list1| grep -C50 list7
 Depends: @, tree:native
 
 Test-Command: cp -a debian/tests/files/ $AUTOPKGTEST_TMP;
               jdupes -@rdNQzo time  -X size+:15 $AUTOPKGTEST_TMP/files;
-              tree -C $AUTOPKGTEST_TMP/
+              tree -C $AUTOPKGTEST_TMP/ | grep -C50 files
 Depends: @, tree:native
 Restrictions: allow-stderr
 
 Test-Command: fsdeploy original-files;
-              jdupes -r $AUTOPKGTEST_TMP/
+              jdupes -r $AUTOPKGTEST_TMP/ 2>&1 | grep "No duplicates found"
 Restrictions: allow-stderr
 Depends: @, forensics-samples-files
+
+# Test for #1030933
+Test-Command: jdupes -r xyz-123 2>&1 | grep "No duplicates found"

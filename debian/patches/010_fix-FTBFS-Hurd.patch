@@ -1,0 +1,19 @@
+Description: declare PATH_MAX for Hurd
+Author: Joao Eriberto Mota Filho <eriberto@debian.org>
+Forwarded: https://github.com/jbruchon/jdupes/pull/265
+Last-Update: 2023-08-29
+Index: jdupes/hashdb.c
+===================================================================
+--- jdupes.orig/hashdb.c
++++ jdupes/hashdb.c
+@@ -27,6 +27,10 @@
+ #endif
+ #define HT_MASK (HT_SIZE - 1)
+ 
++#if defined(__GNU__) && !defined(PATH_MAX)
++ #define PATH_MAX 1024
++#endif
++
+ static hashdb_t *hashdb[HT_SIZE];
+ static int hashdb_init = 0;
+ static int hashdb_algo = 0;

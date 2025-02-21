@@ -36,11 +36,12 @@ do not match files that are on different filesystems or devices
 exclude hidden files from consideration
 .TP
 .B -B --dedupe
-issue the btrfs same-extents ioctl to trigger a deduplication on
-disk. The program must be built with btrfs support for this option
-to be available
+call same-extents ioctl or clonefile() to trigger a filesystem-level
+data deduplication on disk (known as copy-on-write, CoW, cloning, or
+reflink); only a few filesystems support this (BTRFS; XFS when mkfs.xfs
+was used with -m crc=1,reflink=1; Apple APFS)
 .TP
-.B -C --chunk-size=\fIBYTES\fR
+.B -C --chunk-size=\fInumber-of-KiB\fR
 set the I/O chunk size manually; larger values may improve performance
 on rotating media by reducing the number of head seeks required, but
 also increases memory usage and can reduce performance in some cases
@@ -53,6 +54,9 @@ at the end of program execution
 prompt user for files to preserve, deleting all others (see
 .B CAVEATS
 below)
+.TP
+.B -e --error-on-dupe
+exit on any duplicate found with status code 255
 .TP
 .B -f --omit-first
 omit the first file in each set of matches
@@ -70,6 +74,9 @@ reverse (invert) the sort order of matches
 .B -I --isolate
 isolate each command-line parameter from one another; only match if the
 files are under different parameter specifications
+.TP
+.B -j --json
+produce JSON (machine-readable) output
 .TP
 .B -L --link-hard
 replace all duplicate files with hardlinks to the first file in each set
@@ -134,11 +141,18 @@ follow symlinked directories
 .B [WARNING: EXTREME RISK OF DATA LOSS, SEE CAVEATS]
 match based on hash of first block of file data, ignoring the rest
 .TP
+.B -U --no-trav-check
+disable double-traversal safety check (BE VERY CAREFUL)
+.TP
 .B -u --print-unique
 print only a list of unique (non-duplicate, unmatched) files
 .TP
 .B -v --version
 display jdupes version and compilation feature flags
+.TP
+.B -y --hash-db=file
+create/use a hash database text file to speed up future runs by
+caching file hash data
 .TP
 .B -X --ext-filter=spec:info
 exclude/filter files based on specified criteria; general format:
@@ -206,6 +220,9 @@ chain
 .TP
 .B -@@->
 This file was successfully symlinked to the first file in the chain
+.TP
+.B -##->
+This file was successfully cloned from the first file in the chain
 .TP
 .B -==->
 This file was already a hard link to the first file in the chain
@@ -322,10 +339,32 @@ see how they affect performance for your hardware and data set. This
 option does not affect match results in any way, so even if it slows
 down the file matching process it will not hurt anything.
 
-.SH REPORTING BUGS
-Send bug reports to jody@jodybruchon.com or use the issue tracker at:
+The
+.B \-y
+or
+.BR \-\-hash\-db
+feature creates and maintains a text file with a list of
+file paths, hashes, and other metadata that enables jdupes to "remember" file
+data across runs. Specifying a period '.' as the database file name will use a
+name of "jdupes_hashdb.txt" instead; this alias makes it easy to use the hash
+database feature without typing a descriptive name each time. THIS FEATURE IS
+CURRENTLY UNDER DEVELOPMENT AND HAS MANY QUIRKS. USE IT AT YOUR OWN RISK. In
+particular, one of the biggest problems with this feature is that it stores
+every path exactly as specified on the command line; if any paths are passed
+into jdupes on a subsequent run with a different prefix then they will not be
+recognized and they will be treated as totally different files. For example,
+running \fBjdupes \-y . foo/\fP is not the same as \fBjdupes \-y . ./foo\fP nor the same
+as (from a sibling directory) \fBjdupes \-y ../foo\fP. You must run jdupes from the
+same working directory and with the same path specifications to take advantage
+of the hash database feature. When used correctly, a fully populated hash
+database can reduce subsequent runs with hundreds of thousands of files that
+normally take a very long time to run down to the directory scanning time plus
+a couple of seconds. If the directory data is already in the OS disk cache,
+this can make subsequent runs with over 100K files finish in under one second.
 
-http://github.com/jbruchon/jdupes/issues
+.SH REPORTING BUGS
+Send bug reports and feature requests to jody@jodybruchon.com, or for general
+information and help, visit www.jdupes.com
 
 .SH SUPPORTING DEVELOPMENT
 
@@ -340,24 +379,24 @@ and was forked from fdupes 1.51 by Adrian Lopez <adrian2@caribe.net>
 
 .SH LICENSE
 
-The MIT License (MIT)
+MIT License
 
-Copyright (C) 2015-2021 Jody Lee Bruchon and contributors
-Forked from fdupes 1.51, Copyright (C) 1999-2014 Adrian Lopez and contributors
+Copyright (c) 2015-2023 Jody Lee Bruchon <jody@jodybruchon.com>
 
-Permission is hereby granted, free of charge, to any person obtaining a copy of
-this software and associated documentation files (the "Software"), to deal in
-the Software without restriction, including without limitation the rights to
-use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
-the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
 The above copyright notice and this permission notice shall be included in all
 copies or substantial portions of the Software.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
-FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
-COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
-IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

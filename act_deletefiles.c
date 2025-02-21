@@ -1,26 +1,54 @@
 /* Delete duplicate files automatically or interactively
  * This file is part of jdupes; see jdupes.c for license information */
 
+#ifndef NO_DELETE
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <inttypes.h>
 #include <string.h>
 
+#include <libjodycode.h>
 #include "jdupes.h"
-#include "jody_win_unicode.h"
+#include "likely_unlikely.h"
 #include "act_deletefiles.h"
 #include "act_linkfiles.h"
-#include "oom.h"
-
-/* For interactive deletion input */
-#define INPUT_SIZE 512
-
-#ifdef UNICODE
- static wpath_t wstr;
+#ifndef NO_HASHDB
+ #include "hashdb.h"
 #endif
 
-extern void deletefiles(file_t *files, int prompt, FILE *tty)
+/* For interactive deletion input */
+#define INPUT_SIZE 1024
+
+
+/* Count the following statistics:
+   - Maximum number of files in a duplicate set (length of longest dupe chain)
+   - Total number of duplicate file sets (groups) */
+static unsigned int get_max_dupes(const file_t *files, unsigned int * const restrict max)
+{
+  unsigned int groups = 0;
+
+  if (unlikely(files == NULL || max == NULL)) jc_nullptr("get_max_dupes()");
+  LOUD(fprintf(stderr, "get_max_dupes(%p, %p)\n", (const void *)files, (void *)max);)
+
+  *max = 0;
+
+  while (files) {
+    unsigned int n_dupes;
+    if (ISFLAG(files->flags, FF_HAS_DUPES)) {
+      groups++;
+      n_dupes = 1;
+      for (file_t *curdupe = files->duplicates; curdupe; curdupe = curdupe->duplicates) n_dupes++;
+      if (n_dupes > *max) *max = n_dupes;
+    }
+    files = files->next;
+  }
+  return groups;
+}
+
+
+void deletefiles(file_t *files, int prompt, FILE *tty)
 {
   unsigned int counter, groups;
   unsigned int curgroup = 0;
@@ -35,7 +63,7 @@ extern void deletefiles(file_t *files, int prompt, FILE *tty)
 
   LOUD(fprintf(stderr, "deletefiles: %p, %d, %p\n", files, prompt, tty));
 
-  groups = get_max_dupes(files, &max, NULL);
+  groups = get_max_dupes(files, &max);
 
   max++;
 
@@ -43,7 +71,7 @@ extern void deletefiles(file_t *files, int prompt, FILE *tty)
   preserve = (unsigned int *) malloc(sizeof(int) * max);
   preservestr = (char *) malloc(INPUT_SIZE);
 
-  if (!dupelist || !preserve || !preservestr) oom("deletefiles() structures");
+  if (!dupelist || !preserve || !preservestr) jc_oom("deletefiles() structures");
 
   for (; files; files = files->next) {
     if (ISFLAG(files->flags, FF_HAS_DUPES)) {
@@ -52,7 +80,7 @@ extern void deletefiles(file_t *files, int prompt, FILE *tty)
       dupelist[counter] = files;
 
       if (prompt) {
-        printf("[%u] ", counter); fwprint(stdout, files->d_name, 1);
+        printf("[%u] ", counter); jc_fwprint(stdout, files->d_name, 1);
       }
 
       tmpfile = files->duplicates;
@@ -60,7 +88,7 @@ extern void deletefiles(file_t *files, int prompt, FILE *tty)
       while (tmpfile) {
         dupelist[++counter] = tmpfile;
         if (prompt) {
-          printf("[%u] ", counter); fwprint(stdout, tmpfile->d_name, 1);
+          printf("[%u] ", counter); jc_fwprint(stdout, tmpfile->d_name, 1);
         }
         tmpfile = tmpfile->duplicates;
       }
@@ -73,8 +101,8 @@ extern void deletefiles(file_t *files, int prompt, FILE *tty)
         for (x = 2; x <= counter; x++) preserve[x] = 0;
       } else do {
         /* Prompt for files to preserve */
-        printf("Set %u of %u: keep which files? (1 - %u, [a]ll, [n]one",
-          curgroup, groups, counter);
+        printf("Specify multiple files with commas like this: 1,2,4,6\n");
+        printf("Set %u of %u: keep which files? (1 - %u, [a]ll, [n]one", curgroup, groups, counter);
 #ifndef NO_HARDLINKS
        printf(", [l]ink all");
 #endif
@@ -98,7 +126,7 @@ extern void deletefiles(file_t *files, int prompt, FILE *tty)
         /* tail of buffer must be a newline */
         while (preservestr[i] != '\n') {
           tstr = (char *)realloc(preservestr, strlen(preservestr) + 1 + INPUT_SIZE);
-          if (!tstr) oom("deletefiles() prompt string");
+          if (!tstr) jc_oom("deletefiles() prompt");
 
           preservestr = tstr;
           if (!fgets(preservestr + i + 1, INPUT_SIZE, tty))
@@ -111,9 +139,40 @@ extern void deletefiles(file_t *files, int prompt, FILE *tty)
 
         for (x = 1; x <= counter; x++) preserve[x] = 0;
 
+	/* Catch attempts to use invalid characters and block them */
+        for (char *pscheck = preservestr; *pscheck != '\0'; pscheck++) {
+          switch (*pscheck) {
+            case ',':
+            case ' ':
+            case 'a':
+            case 'A':
+            case 's':
+            case 'S':
+            case 'l':
+            case 'L':
+            case 'n':
+            case 'N':
+            case '\n':
+            case '\0':
+              continue;
+	    default:
+	      break;
+	  }
+          if (*pscheck >= '0' && *pscheck <= '9') continue;
+          if (*pscheck == '-') {
+            fprintf(stderr, "error: number ranges are not yet supported; taking no action\n");
+	    goto skip_deletion;
+	  }
+          fprintf(stderr, "error: invalid character '%c' in preserve answer; taking no action\n", *pscheck);
+	  goto skip_deletion;
+        }
         token = strtok(preservestr, " ,\n");
         if (token != NULL) {
+#if defined NO_HARDLINKS && defined NO_SYMLINKS
+          /* no linktype needed */
+#else
           int linktype = -1;
+#endif /* defined NO_HARDLINKS && defined NO_SYMLINKS */
           /* "Delete none" = stop parsing string */
           if (*token == 'n' || *token == 'N') goto stop_scanning;
           /* If requested, link this set instead */
@@ -123,10 +182,14 @@ extern void deletefiles(file_t *files, int prompt, FILE *tty)
 #ifndef NO_SYMLINKS
           if (*token == 's' || *token == 'S') linktype = 0; /* symlink */
 #endif
+#if defined NO_HARDLINKS && defined NO_SYMLINKS
+          /* no linking calls */
+#else
           if (linktype != -1) {
             linkfiles(files, linktype, 1);
             goto skip_deletion;
           }
+#endif /* defined NO_HARDLINKS && defined NO_SYMLINKS */
         }
 
         while (token != NULL) {
@@ -136,6 +199,10 @@ extern void deletefiles(file_t *files, int prompt, FILE *tty)
           number = 0;
           sscanf(token, "%u", &number);
           if (number > 0 && number <= counter) preserve[number] = 1;
+          else {
+            fprintf(stderr, "invalid number '%u' in preserve answer; taking no action\n", number);
+            goto skip_deletion;
+	  }
 
           token = strtok(NULL, " ,\n");
         }
@@ -148,31 +215,44 @@ stop_scanning:
 
       for (x = 1; x <= counter; x++) {
         if (preserve[x]) {
-          printf("   [+] "); fwprint(stdout, dupelist[x]->d_name, 1);
+          printf("   [+] "); jc_fwprint(stdout, dupelist[x]->d_name, 1);
         } else {
 #ifdef UNICODE
           if (!M2W(dupelist[x]->d_name, wstr)) {
-            printf("   [!] "); fwprint(stdout, dupelist[x]->d_name, 0);
+            printf("   [!] "); jc_fwprint(stdout, dupelist[x]->d_name, 0);
             printf("-- MultiByteToWideChar failed\n");
+            exit_status = EXIT_FAILURE;
             continue;
           }
 #endif
           if (file_has_changed(dupelist[x])) {
-            printf("   [!] "); fwprint(stdout, dupelist[x]->d_name, 0);
+            printf("   [!] "); jc_fwprint(stdout, dupelist[x]->d_name, 0);
             printf("-- file changed since being scanned\n");
+            exit_status = EXIT_FAILURE;
 #ifdef UNICODE
           } else if (DeleteFileW(wstr) != 0) {
 #else
           } else if (remove(dupelist[x]->d_name) == 0) {
 #endif
-            printf("   [-] "); fwprint(stdout, dupelist[x]->d_name, 1);
+            printf("   [-] "); jc_fwprint(stdout, dupelist[x]->d_name, 1);
+#ifndef NO_HASHDB
+            if (ISFLAG(flags, F_HASHDB)) {
+              dupelist[x]->mtime = 0;
+              add_hashdb_entry(NULL, 0, dupelist[x]);
+          }
+#endif
           } else {
-            printf("   [!] "); fwprint(stdout, dupelist[x]->d_name, 0);
+            printf("   [!] "); jc_fwprint(stdout, dupelist[x]->d_name, 0);
             printf("-- unable to delete file\n");
+            exit_status = EXIT_FAILURE;
           }
         }
       }
+#if defined NO_HARDLINKS && defined NO_SYMLINKS
+      /* label not needed */
+#else
 skip_deletion:
+#endif /* defined NO_HARDLINKS && defined NO_SYMLINKS */
       printf("\n");
     }
   }
@@ -181,3 +261,5 @@ skip_deletion:
   free(preservestr);
   return;
 }
+
+#endif /* NO_DELETE */

@@ -1,1 +1,52 @@
-.pc/
+#
+# Build ignores
+#
+#.*
+*.o
+*.o.*
+*.a
+*.so
+*.so.*
+*.1.gz
+
+#
+# Never ignore these
+#
+!.gitignore
+
+#
+# Normal output and testing dirs
+#
+/build_date.h
+/jdupes
+/jdupes*.exe
+/jdupes-standalone
+/jdupes-*-*/
+/jdupes-*-*.zip
+/jdupes_hashdb.txt
+/*.pkg.tar.*
+test_temp
+output.log
+
+#
+# Backups / patches
+#
+*~
+*.orig
+*.rej
+/*.patch
+
+#
+# debugging and editor stuff
+#
+core
+.gdb_history
+.gdbinit
+.*.swp
+*.gcda
+*.gcno
+*.gcov
+cachegrind.out.*
+
+# Mac OS
+.DS_Store
