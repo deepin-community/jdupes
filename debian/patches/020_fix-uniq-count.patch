@@ -1,0 +1,18 @@
+Description: Fix bit flag conflict: FF_NOT_UNIQUE and FF_HASHDB_DIRTY used same bit
+Author: Jody Bruchon <jody@jodybruchon.com>
+Origin: upstream
+Bug-Debian: https://bugs.debian.org/1063079
+Last-Update: 2025-10-06
+Index: jdupes-1.28.0/jdupes.h
+===================================================================
+--- jdupes-1.28.0.orig/jdupes.h
++++ jdupes-1.28.0/jdupes.h
+@@ -193,7 +193,7 @@ extern uint64_t flags, a_flags, p_flags;
+ #define FF_HAS_DUPES		(1U << 3)
+ #define FF_IS_SYMLINK		(1U << 4)
+ #define FF_NOT_UNIQUE		(1U << 5)
+-#define FF_HASHDB_DIRTY		(1U << 5)
++#define FF_HASHDB_DIRTY		(1U << 6)
+ 
+ /* Extra print flags */
+ #define PF_PARTIAL		(1U << 0)

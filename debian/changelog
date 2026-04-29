@@ -1,3 +1,18 @@
+jdupes (1.28.0-1+deb13u1) trixie; urgency=medium
+
+  * debian/patches/020_fix-uniq-count.patch: created to fix flag overlap
+    between FF_NOT_UNIQUE and FF_HASHDB_DIRTY.
+    .
+    Both FF_NOT_UNIQUE and FF_HASHDB_DIRTY were defined using the same
+    bit (1U << 5), causing logic errors where files were incorrectly
+    marked as not unique due to hash database state. This commit moves
+    FF_HASHDB_DIRTY to (1U << 6) to eliminate the overlap. It fixes
+    incorrect behavior when detecting unique files with --unique or -u.
+    .
+    Closes: #1063079
+
+ -- Joao Eriberto Mota Filho <eriberto@debian.org>  Sun, 05 Oct 2025 22:45:33 -0300
+
 jdupes (1.28.0-1) unstable; urgency=medium
 
   * New upstream version 1.28.0.
